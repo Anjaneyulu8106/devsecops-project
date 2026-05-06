@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: staging-app
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: staging-app
+  template:
+    metadata:
+      labels:
+        app: staging-app
+    spec:
+      containers:
+      - name: staging-container
+        image: myapp
+        ports:
+        - containerPort: 5000
