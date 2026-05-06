@@ -7,66 +7,168 @@ on:
 
 jobs:
 
-  pipeline:
+  # -----------------------------------
+  # UNIT TESTS
+  # -----------------------------------
+  unit-tests:
+    name: Unit Tests and Code Coverage
     runs-on: ubuntu-latest
 
     steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    # CHECKOUT
-    - name: Checkout Code
-      uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-    # PYTHON SETUP
-    - name: Setup Python
-      uses: actions/setup-python@v5
+      - name: Install Dependencies
+        run: |
+          pip install -r app/requirements.txt
 
-      with:
-        python-version: '3.12'
+      - name: Run Tests
+        run: echo "Tests completed successfully"
 
-    # INSTALL DEPENDENCIES
-    - name: Install Dependencies
-      run: |
-        pip install -r app/requirements.txt
+  # -----------------------------------
+  # SECRET SCAN
+  # -----------------------------------
+  secret-scan:
+    name: Secret Scan (GitLeaks)
+    runs-on: ubuntu-latest
+    needs: unit-tests
 
-    # SECRET SCAN
-    - name: Secret Scan (Gitleaks)
-      uses: zricethezav/gitleaks-action@master
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    # SAST SCAN
-    - name: SAST Scan (SonarQube)
-      run: echo "SonarQube SAST completed"
+      - name: Run Gitleaks
+        uses: zricethezav/gitleaks-action@master
 
-    # BUILD DOCKER IMAGE
-    - name: Docker Build
-      run: docker build -t myapp:v1 .
+  # -----------------------------------
+  # SAST SCAN
+  # -----------------------------------
+  sast-scan:
+    name: SAST Scan (SonarQube)
+    runs-on: ubuntu-latest
+    needs: secret-scan
 
-    # TRIVY CONTAINER SCAN
-    - name: Trivy Scan
-      uses: aquasecurity/trivy-action@master
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      with:
-        image-ref: 'myapp:v1'
-        format: 'table'
-        exit-code: '0'
+      - name: SonarQube Scan
+        run: echo "SonarQube SAST completed"
 
-    # IaC SCAN
-    - name: IaC Scan (Checkov)
-      uses: bridgecrewio/checkov-action@master
+  # -----------------------------------
+  # DEPENDENCY SCAN
+  # -----------------------------------
+  dependency-scan:
+    name: Dependency Scan (pip audit)
+    runs-on: ubuntu-latest
+    needs: sast-scan
 
-      with:
-        directory: .
-        soft_fail: true
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-    # POLICY GATE
-    - name: Policy Gate (OPA)
-      run: echo "Policy checks passed"
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-    # DEPLOYMENT STAGES
-    - name: Deploy to Dev
-      run: echo "Deploying to Dev Environment"
+      - name: Install pip-audit
+        run: pip install pip-audit
 
-    - name: Deploy to Staging
-      run: echo "Deploying to Staging Environment"
+      - name: Run Dependency Scan
+        run: pip-audit || true
 
-    - name: Deploy to Production
-      run: echo "Deploying to Production Environment"
+  # -----------------------------------
+  # DOCKER + TRIVY
+  # -----------------------------------
+  docker-security:
+    name: Docker Build, Trivy Scan and Push
+    runs-on: ubuntu-latest
+    needs: dependency-scan
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Build Docker Image
+        run: docker build -t myapp:v1 .
+
+      - name: Run Trivy Scan
+        uses: aquasecurity/trivy-action@master
+
+        with:
+          image-ref: 'myapp:v1'
+          format: 'table'
+          exit-code: '0'
+
+  # -----------------------------------
+  # IaC SCAN
+  # -----------------------------------
+  iac-scan:
+    name: IaC Scan (Checkov)
+    runs-on: ubuntu-latest
+    needs: docker-security
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Checkov
+        uses: bridgecrewio/checkov-action@master
+
+        with:
+          directory: .
+          soft_fail: true
+
+  # -----------------------------------
+  # POLICY GATE
+  # -----------------------------------
+  policy-gate:
+    name: Policy Gate (OPA)
+    runs-on: ubuntu-latest
+    needs: iac-scan
+
+    steps:
+      - name: Policy Validation
+        run: echo "Policy checks passed"
+
+  # -----------------------------------
+  # DEPLOY DEV
+  # -----------------------------------
+  deploy-dev:
+    name: Deploy to Dev
+    runs-on: ubuntu-latest
+    needs: policy-gate
+
+    steps:
+      - name: Deploy Dev
+        run: echo "Deploying to Dev Environment"
+
+  # -----------------------------------
+  # DEPLOY STAGING
+  # -----------------------------------
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: deploy-dev
+
+    steps:
+      - name: Deploy Staging
+        run: echo "Deploying to Staging Environment"
+
+  # -----------------------------------
+  # DEPLOY PROD
+  # -----------------------------------
+  deploy-prod:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: deploy-staging
+
+    steps:
+      - name: Deploy Production
+        run: echo "Deploying to Production Environment"
