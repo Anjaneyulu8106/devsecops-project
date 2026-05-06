@@ -1,19 +1,83 @@
 apiVersion: apps/v1
 kind: Deployment
+
 metadata:
   name: prod-app
+  namespace: prod
+
 spec:
   replicas: 3
+
   selector:
     matchLabels:
       app: prod-app
+
   template:
     metadata:
       labels:
         app: prod-app
+
     spec:
+      automountServiceAccountToken: false
+
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
+
       containers:
       - name: prod-container
-        image: myapp
+        image: myapp:v1
+        imagePullPolicy: Never
+
         ports:
         - containerPort: 5000
+
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+
+          capabilities:
+            drop:
+              - ALL
+
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 5000
+
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 5000
+
+          initialDelaySeconds: 5
+          periodSeconds: 3
+
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+
+metadata:
+  name: deny-all
+  namespace: prod
+
+spec:
+  podSelector: {}
+
+  policyTypes:
+    - Ingress
+    - Egress
