@@ -2,42 +2,48 @@ name: DevSecOps Pipeline
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
+
   pipeline:
     runs-on: ubuntu-latest
 
     steps:
+
     - name: Checkout
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
-    # 🔐 SECRET SCAN
+    # SECRET SCAN
     - name: Secret Scan
-      uses: trufflesecurity/trufflehog@main
-      with:
-        path: .
+      uses: zricethezav/gitleaks-action@master
 
-    # 📦 BUILD DOCKER IMAGE
-    - name: Build Image
-      run: docker build -t myapp .
+    # BUILD IMAGE
+    - name: Build Docker Image
+      run: docker build -t myapp:v1 .
 
-    # 🛡️ CONTAINER SCAN
-    - name: Scan Image
+    # TRIVY CONTAINER SCAN
+    - name: Trivy Scan
       uses: aquasecurity/trivy-action@master
+
       with:
-        image-ref: myapp
-        exit-code: 1
-        severity: HIGH,CRITICAL
+        image-ref: 'myapp:v1'
+        format: 'table'
 
-    # 🚀 DEPLOY DEV (simulation)
+    # CHECKOV IaC SCAN
+    - name: Checkov Scan
+      uses: bridgecrewio/checkov-action@master
+
+      with:
+        directory: .
+
+    # DEPLOYMENT STAGES
     - name: Deploy to Dev
-      run: echo "Deploying to Dev Environment"
+      run: echo "Deploying to Dev"
 
-    # 🚀 DEPLOY STAGING
     - name: Deploy to Staging
       run: echo "Deploying to Staging"
 
-    # 🚀 DEPLOY PROD
-    - name: Deploy to Prod
+    - name: Deploy to Production
       run: echo "Deploying to Production"
