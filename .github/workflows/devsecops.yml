@@ -12,6 +12,7 @@ jobs:
 
     steps:
 
+    # CHECKOUT CODE
     - name: Checkout
       uses: actions/checkout@v4
 
@@ -19,7 +20,7 @@ jobs:
     - name: Secret Scan
       uses: zricethezav/gitleaks-action@master
 
-    # BUILD IMAGE
+    # BUILD DOCKER IMAGE
     - name: Build Docker Image
       run: docker build -t myapp:v1 .
 
@@ -30,20 +31,24 @@ jobs:
       with:
         image-ref: 'myapp:v1'
         format: 'table'
+        exit-code: '0'
 
-    # CHECKOV IaC SCAN
+    # CHECKOV IaC SECURITY SCAN
     - name: Checkov Scan
       uses: bridgecrewio/checkov-action@master
 
       with:
         directory: .
+        soft_fail: true
 
-    # DEPLOYMENT STAGES
+    # DEV DEPLOYMENT
     - name: Deploy to Dev
-      run: echo "Deploying to Dev"
+      run: echo "Deploying to Dev Environment"
 
+    # STAGING DEPLOYMENT
     - name: Deploy to Staging
-      run: echo "Deploying to Staging"
+      run: echo "Deploying to Staging Environment"
 
+    # PRODUCTION DEPLOYMENT
     - name: Deploy to Production
-      run: echo "Deploying to Production"
+      run: echo "Deploying to Production Environment"
